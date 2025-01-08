@@ -1,13 +1,14 @@
 import os
-import streamlit as st
+
 import google.generativeai as genai
+import streamlit as st
 from PyPDF2 import PdfReader
 from dotenv import load_dotenv
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
 
 load_dotenv()
 
@@ -35,12 +36,12 @@ def get_vector_store(text_chunks):
     vector_store.save_local("faiss_index")
 
 
-def get_conversational_chain(context, question):
+def get_conversational_chain():
     prompt_template = f"""
     Answer the question as detailed as possible from the provided content ,make sure to provide all the details, 
     if answer is not in provided context just say, "Answer is not available in the context", don;t provide the wrong answer
-    Context:\n {context}? \n
-    Question: \n {question}\n
+    Context:\n context? \n
+    Question: \n question\n
     
     Answer:
     """
@@ -48,3 +49,42 @@ def get_conversational_chain(context, question):
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
     return chain
+
+
+def user_input(user_question):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    new_df = FAISS.load_local("faiss_index", embeddings)
+    docs = new_df.similarity_search(user_question)
+
+    chain = get_conversational_chain()
+
+    response = chain(
+        {"input_documents": docs, "question": user_question},
+        return_only_outputs=True
+    )
+    print(response)
+    st.write("Reply: ", response["output_text"])
+
+
+def main():
+    st.set_page_config("Chat PDF")
+    st.header("Chat with Multiple PDF using Gemini")
+
+    user_question = st.text_input("Ask a question from the PDF files")
+
+    if user_question:
+        user_input(user_question)
+
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader("Upload your PDF files and Click on the Submit & Porcess button", type=["pdf"])
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                get_vector_store(text_chunks)
+                st.success("Done")
+
+
+if __name__ == "__main__":
+    main()
