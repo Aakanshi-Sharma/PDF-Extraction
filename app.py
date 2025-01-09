@@ -15,8 +15,7 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GOOGLE-API-KEY"))
 
-if "GOOGLE_API_KEY" not in os.environ:
-    os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE-API-KEY")
+os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE-API-KEY")
 
 
 def get_pdf_text(pdf_docs):
